@@ -7,6 +7,7 @@ class UnivariateGaussian:
     """
     Class for univariate Gaussian Distribution Estimator
     """
+
     def __init__(self, biased_var: bool = False) -> UnivariateGaussian:
         """
         Estimator for univariate Gaussian mean and variance parameters
@@ -51,8 +52,13 @@ class UnivariateGaussian:
         Sets `self.mu_`, `self.var_` attributes according to calculated estimation (where
         estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
+        self.mu_ = X.mean()
 
+        minus = 1
+        if self.biased_:
+            minus = 0
+
+        self.var_ = np.sum((X - self.mu_) ** 2) / (len(X) - minus)
         self.fitted_ = True
         return self
 
@@ -75,8 +81,15 @@ class UnivariateGaussian:
         ValueError: In case function was called prior fitting the model
         """
         if not self.fitted_:
-            raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+            raise ValueError(
+                "Estimator must first be fitted before calling `pdf` function")
+
+        a = 1 / np.sqrt(2 * np.pi * self.var_)
+        b = 1 / (2 * self.var_)
+        c = (X - self.mu_) ** 2
+
+        ret = a * np.exp(-b * c)
+        return ret
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
@@ -97,13 +110,27 @@ class UnivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
+        d = X - mu
+        d_power = d ** 2
+        a = np.sum(d_power)
 
+        two_sigma = 2 * sigma
+
+        two_pai = 2*np.pi
+        two_pai_sigma_prod = two_pai * sigma
+
+        m = len(X)
+
+        b = np.log(two_pai_sigma_prod)*(m/2)
+
+        ret = -a / two_sigma - b
+        return ret
 
 class MultivariateGaussian:
     """
     Class for multivariate Gaussian Distribution Estimator
     """
+
     def __init__(self):
         """
         Initialize an instance of multivariate Gaussian estimator
@@ -143,7 +170,11 @@ class MultivariateGaussian:
         Sets `self.mu_`, `self.cov_` attributes according to calculated estimation.
         Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
+        self.mu_ = X.mean(axis=0)
+        temp = X - self.mu_
+        a = 1 / len(X) - 1
+        b = np.dot(temp.T, temp)
+        self.cov_ = a * b
 
         self.fitted_ = True
         return self
@@ -167,11 +198,25 @@ class MultivariateGaussian:
         ValueError: In case function was called prior fitting the model
         """
         if not self.fitted_:
-            raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+            raise ValueError(
+                "Estimator must first be fitted before calling `pdf` function")
+        d = X[:, np.newaxis, :] - self.mu_
+        md = np.sum(d.dot(inv(self.cov_)) * d, axis=2)
+        md = md.flatten()
+
+        m = len(X)
+        two_pai = 2*np.pi
+        cov_det = det(self.cov_)
+
+        a = np.exp(-.5 * md)
+        b = np.sqrt((two_pai ** m) * cov_det)
+
+        ret = a / b
+        return ret
 
     @staticmethod
-    def log_likelihood(mu: np.ndarray, cov: np.ndarray, X: np.ndarray) -> float:
+    def log_likelihood(mu: np.ndarray, cov: np.ndarray,
+                       X: np.ndarray) -> float:
         """
         Calculate the log-likelihood of the data under a specified Gaussian model
 
@@ -189,4 +234,13 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated over all input data and under given parameters of Gaussian
         """
-        raise NotImplementedError()
+        d = X[:, np.newaxis, :] - mu
+        md = np.sum(d.dot(inv(cov)) * d)
+
+        m = len(X)
+        a = m * slogdet(cov)[1]
+        b = m * X.shape[1] * np.log(2 * np.pi)
+        half = 1 / 2
+
+        ret = -half * (md + a + b)
+        return ret
